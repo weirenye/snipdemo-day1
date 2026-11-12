@@ -81,3 +81,31 @@ git push origin main
 
 Component commits and superproject pointer commits are separate records. Never
 pre-create layer folders as ordinary directories, and never hand-edit `bundle`.
+
+## Generate a release
+
+```sh
+node scripts/smoke.mjs
+node scripts/build-bundle.mjs
+node scripts/build-bundle.mjs
+node scripts/build-bundle.mjs --push
+```
+
+The builder updates source submodules to remote branch tips, records their exact
+SHAs in `bundle/release.json`, restores locked frontend dependencies with `npm ci`,
+builds the UI and runs API/CLI/bundle smoke checks before committing. `npm ci`
+replaces the tutorial's `npm install` to avoid implicit dependency drift.
+Runs with identical inputs create no new commits; `--push` also publishes commits
+from earlier local-only runs. Local changes and unrelated staged work are rejected.
+
+```sh
+cd bundle
+bun start
+docker build -t snip .
+docker run --rm -p 3000:3000 snip
+```
+
+The Bun image digest is pinned and runs as its non-root `bun` user. CLI execution
+requires Node on the host; the Bun-only container serves UI/API/redirects.
+`PUBLIC_DIR=./public` is generated configuration, not a secret.
+Do not add credentials to bundle output.
