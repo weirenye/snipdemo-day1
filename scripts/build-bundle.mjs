@@ -23,7 +23,10 @@ const git = (args, cwd = root) => run('git', args, cwd, true);
 const changed = cwd => git(['diff', '--cached', '--name-only'], cwd) !== '';
 function commit(message, cwd) {
   if (!changed(cwd)) { console.log(`${cwd === bundle ? 'bundle' : 'main'} unchanged: nothing to commit`); return; }
-  git(['-c', 'user.name=OpenBot', '-c', 'user.email=335604065+openbotgit[bot]@users.noreply.github.com',
+  const identity = process.env.GITHUB_ACTIONS
+    ? ['user.name=github-actions[bot]', 'user.email=41898282+github-actions[bot]@users.noreply.github.com']
+    : ['user.name=OpenBot', 'user.email=335604065+openbotgit[bot]@users.noreply.github.com'];
+  git(['-c', identity[0], '-c', identity[1],
     'commit', '-m', message, '-m', trailers], cwd);
 }
 

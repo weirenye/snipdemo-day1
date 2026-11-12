@@ -1,0 +1,50 @@
+name: Build bundle
+on:
+  # Source branches do not contain this workflow, so their pushes cannot run it.
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: snip-bundle
+  cancel-in-progress: false
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          submodules: true
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.4.4'
+      - name: Configure Git identity
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
+      - name: Build and publish branch output
+        id: release
+        run: |
+          before=$(git ls-remote origin refs/heads/main | cut -f1)
+          node scripts/build-bundle.mjs --push
+          after=$(git rev-parse HEAD)
+          if [ "$before" != "$after" ]; then
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          fi
+      # GITHUB_TOKEN pushes do not trigger push workflows. Dispatch explicitly,
+      # only for a new pinned release; actions:write is scoped to this job.
+      - name: Dispatch image verification
+        if: steps.release.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run docker.yml --ref main --repo "$GITHUB_REPOSITORY"

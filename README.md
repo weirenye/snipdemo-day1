@@ -109,3 +109,36 @@ The Bun image digest is pinned and runs as its non-root `bun` user. CLI executio
 requires Node on the host; the Bun-only container serves UI/API/redirects.
 `PUBLIC_DIR=./public` is generated configuration, not a secret.
 Do not add credentials to bundle output.
+
+## CI and release security
+
+`main` must be the GitHub default branch for hourly schedules and manual workflows.
+`bundle.yml` rebuilds hourly or on manual dispatch. It uses a write-scoped job for
+branch updates, and explicitly dispatches Docker verification when a new release
+is pinned: pushes using `GITHUB_TOKEN` do not trigger other push workflows.
+
+`docker.yml` runs on changes to the `bundle` gitlink or its own workflow file, and
+on manual dispatch. It never updates submodules to branch tips. It verifies the
+source manifest and rebuilt UI bytes, runs frontend and API/CLI tests, and blocks
+on high/critical npm audit findings. A separate image job builds once, scans with
+Trivy, smoke-tests that container, and only then publishes that same image as
+`ghcr.io/weirenye/snipdemo-day1:latest` and `sha-<short-main-sha>`.
+Action revisions and the Bun base image are pinned. Only publication has
+`packages: write`; no personal token is stored in workflows.
+
+The current Angular 19 dependency tree has high and critical audit findings.
+Publication is intentionally blocked until those are resolved; do not bypass the
+gate or force an Angular major upgrade without agreeing on the architecture change.
+Docker is unavailable locally; container/image checks run on GitHub's Linux runner.
+GHCR packages may initially be private.
+
+## Railway
+
+The generated branch includes Dockerfile builder selection and an `/api/links`
+health check. Match `PORT` (default 3000) to the public domain target port and set
+`BASE_URL` for a custom origin, otherwise the Railway public domain is used.
+Storage remains in memory; redeploys and rollbacks clear links.
+The tutorial's bundle-branch auto-deploy would bypass the image release gate.
+For verified releases, deploy a passing GHCR image by immutable digest, retain the
+previous verified digest for rollback, and smoke-test UI/create/list/redirect/CLI.
+No Railway service has been configured or deployed by this workshop pipeline.
